@@ -1,0 +1,24 @@
+services:
+  gateway:
+    build: 
+      context: ./gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    networks:
+      - microservices
+    depends_on:
+      - user-service
+
+  user-service:
+    build: 
+      context: ./microservices/user_service
+      dockerfile: Dockerfile
+    expose:
+      - "8080"
+    networks:
+      - microservices
+
+networks:
+  microservices:
+    name: microservices

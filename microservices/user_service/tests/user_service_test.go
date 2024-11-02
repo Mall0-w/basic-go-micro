@@ -5,19 +5,32 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"user-service/controller"
+	userservice "user-service/service"
 
-	"github.com/Mall0-w/basic-go-micro/gateway"
+	"github.com/gin-gonic/gin"
 )
+
+func setupRouter() *gin.Engine {
+	// Switch to test mode
+	gin.SetMode(gin.TestMode)
+
+	r := gin.Default()
+	userService := userservice.NewUserService(nil)
+	userController := controller.NewUserController(userService)
+	userController.DefineRoutes(r)
+	return r
+}
 
 func TestHelloWorld(t *testing.T) {
 	// Create a new router instance
-	router := gateway.CreateRouter()
+	router := setupRouter()
 
 	// Create a new HTTP recorder
 	w := httptest.NewRecorder()
 
 	// Create a new request
-	req, err := http.NewRequest("GET", "/", nil)
+	req, err := http.NewRequest("GET", "/users/", nil)
 	if err != nil {
 		t.Fatalf("Couldn't create request: %v\n", err)
 	}
@@ -37,7 +50,7 @@ func TestHelloWorld(t *testing.T) {
 		t.Fatalf("Couldn't parse response body: %v\n", err)
 	}
 
-	expectedResponse := "Hello World!"
+	expectedResponse := "This is the users service"
 	if response != expectedResponse {
 		t.Errorf("Expected response body '%s', got '%s'", expectedResponse, response)
 	}
