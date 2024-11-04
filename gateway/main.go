@@ -12,15 +12,14 @@ func helloWorld(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, "Hello World!")
 }
 
-// createUserServiceProxy creates a reverse proxy to the user service
-func createUserServiceProxy() gin.HandlerFunc {
+func CreateProxy(proxyUrl string) gin.HandlerFunc {
 	// URL of the user service (matching the service name in docker-compose)
-	userServiceURL, err := url.Parse("http://user-service:8080")
+	serviceURL, err := url.Parse(proxyUrl)
 	if err != nil {
 		panic(err)
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(userServiceURL)
+	proxy := httputil.NewSingleHostReverseProxy(serviceURL)
 
 	return func(c *gin.Context) {
 		proxy.ServeHTTP(c.Writer, c.Request)
@@ -36,7 +35,12 @@ func CreateRouter() *gin.Engine {
 	// User service routes
 	users := router.Group("/users")
 	{
-		users.Any("/*path", createUserServiceProxy())
+		users.Any("/*path", CreateProxy("http://user-service:8080"))
+	}
+
+	inventory := router.Group("/inventory")
+	{
+		inventory.Any("/*path", CreateProxy("http://inventory-service:8080"))
 	}
 
 	return router
