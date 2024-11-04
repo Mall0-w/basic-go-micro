@@ -12,10 +12,16 @@ services:
     build: 
       context: ./microservices/user_service
       dockerfile: Dockerfile
+    env_file:
+      - ./microservices/user_service/.env
     expose:
       - "8080"
+    depends_on:
+      user-db:
+        condition: service_healthy # Only start after user-db is healthy
     networks:
       - microservices
+      - user
   
   inventory-service:
     build: 
@@ -26,6 +32,26 @@ services:
     networks:
       - microservices
 
+  user-db:
+    image: mysql:8.0
+    container_name: user-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${USER_DB_PASSWORD}
+      MYSQL_DATABASE: users
+    ports:
+      - "3308:3306"
+    volumes:
+      - ./dbs/user-service-db:/var/lib/mysql
+    networks:
+      - user
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 networks:
   microservices:
     name: microservices
+  user:
+    name: user

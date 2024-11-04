@@ -2,7 +2,7 @@ package repository
 
 import (
 	"errors"
-	. "user-service/dtos"
+	. "user-service/models"
 )
 
 var (

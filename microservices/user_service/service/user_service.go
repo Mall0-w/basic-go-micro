@@ -15,14 +15,16 @@ var (
 
 // UserService handles business logic for user operations
 type UserService struct {
-	userRepo repository.UserRepository
+	userRepo *repository.UserRepository
 }
 
 // NewUserService creates a new instance of UserService
 func NewUserService(userRepo repository.UserRepository) *UserService {
-
+	if userRepo == nil {
+		userRepo = repository.NewMysqlUserRepository(nil)
+	}
 	return &UserService{
-		userRepo: userRepo,
+		userRepo: &userRepo,
 	}
 }
 
