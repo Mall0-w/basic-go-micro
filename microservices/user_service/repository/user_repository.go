@@ -1,12 +1,7 @@
 package repository
 
 import (
-	"errors"
 	. "user-service/models"
-)
-
-var (
-	ErrNotFound = errors.New("record not found")
 )
 
 // UserRepository defines the interface for user data operations

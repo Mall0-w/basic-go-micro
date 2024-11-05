@@ -43,6 +43,7 @@ func NewMysqlUserRepository(db *gorm.DB) UserRepository {
 func (r MysqlUserRepository) FindByID(id int64) (*User, error) {
 	var user User
 	result := r.DB.First(&user, id)
+
 	if result.Error != nil {
 		return nil, result.Error
 	}

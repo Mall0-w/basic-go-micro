@@ -3,19 +3,18 @@ package userservice
 import (
 	"errors"
 	"fmt"
-	. "user-service/dtos"
+	"net/http"
+	"user-service/dtos"
+	e "user-service/errors"
+	"user-service/models"
 	"user-service/repository" // Assuming you'll have a repository layer
-)
 
-var (
-	ErrUserNotFound    = errors.New("user not found")
-	ErrUserExists      = errors.New("user already exists")
-	ErrInvalidUserData = errors.New("invalid user data")
+	"golang.org/x/crypto/bcrypt"
 )
 
 // UserService handles business logic for user operations
 type UserService struct {
-	userRepo *repository.UserRepository
+	userRepo repository.UserRepository
 }
 
 // NewUserService creates a new instance of UserService
@@ -24,128 +23,121 @@ func NewUserService(userRepo repository.UserRepository) *UserService {
 		userRepo = repository.NewMysqlUserRepository(nil)
 	}
 	return &UserService{
-		userRepo: &userRepo,
+		userRepo: userRepo,
 	}
 }
 
 // GetUserByID retrieves a user by their ID
-func (s *UserService) GetUserByID(id int64) (*User, error) {
+func (s *UserService) GetUserByID(id int64) (*dtos.User, *e.Error) {
 	if id <= 0 {
-		return nil, fmt.Errorf("%w: invalid ID", ErrInvalidUserData)
+		return nil, e.NewError(http.StatusBadRequest, "invalid Id", e.ErrInvalidUserData)
 	}
 
-	// user, err := s.userRepo.FindByID(id)
-	user := NewUser(id, "test user", "test user")
-	var err error = nil
+	user, err := s.userRepo.FindByID(id)
 
 	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			return nil, fmt.Errorf("%w: id=%d", ErrUserNotFound, id)
+		if errors.Is(err, e.ErrRecordNotFound) {
+			return nil, e.NewError(http.StatusNotFound, "User Doesn't exist", e.ErrNotFound)
 		}
-		return nil, fmt.Errorf("failed to get user: %w", err)
+		return nil, e.NewError(http.StatusInternalServerError, "Failed to get user", err)
 	}
 
-	return user, nil
+	return user.ToUserDTO(), nil
 }
 
 // CreateUser creates a new user
-// func (s *UserService) CreateUser(name, email string) (*User, error) {
-// 	if err := s.validateUserData(name, email); err != nil {
-// 		return nil, err
-// 	}
+func (s *UserService) CreateUser(u *dtos.UserCreate) (*dtos.User, *e.Error) {
 
-// 	// Check if user with email already exists
-// 	exists, err := s.userRepo.ExistsByEmail(email)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to check user existence: %w", err)
-// 	}
-// 	if exists {
-// 		return nil, fmt.Errorf("%w: email=%s", ErrUserExists, email)
-// 	}
+	hashPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 
-// 	user := &User{
-// 		Name:  name,
-// 		Email: email,
-// 	}
+	if err != nil {
+		return nil, e.NewError(http.StatusInternalServerError, "failed to create password", err)
+	}
 
-// 	createdUser, err := s.userRepo.Create(user)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to create user: %w", err)
-// 	}
+	exists, err := s.userRepo.ExistsByEmail(u.Email)
+	if err != nil {
+		return nil, e.NewError(http.StatusInternalServerError, "error when looking up email", err)
+	}
 
-// 	return createdUser, nil
-// }
+	if exists {
+		return nil, e.NewError(http.StatusBadRequest, "Email already exists", e.ErrUserExists)
+	}
+
+	user := models.NewUser(u.Name, u.Email, string(hashPassword))
+	createdUser, err := s.userRepo.Create(user)
+	if err != nil {
+		return nil, e.NewError(http.StatusInternalServerError, "failed to create password", err)
+	}
+
+	return createdUser.ToUserDTO(), nil
+}
 
 // // UpdateUser updates an existing user
-// func (s *UserService) UpdateUser(id int64, name, email string) (*User, error) {
-// 	if id <= 0 {
-// 		return nil, fmt.Errorf("%w: invalid ID", ErrInvalidUserData)
-// 	}
+func (s *UserService) UpdateUser(u *dtos.User) (*dtos.User, *e.Error) {
+	if u.Id <= 0 {
+		return nil, e.NewError(http.StatusBadRequest, "Invalid Id", e.ErrInvalidUserData)
+	}
 
-// 	if err := s.validateUserData(name, email); err != nil {
-// 		return nil, err
-// 	}
+	// Check if user exists
+	existingUser, err := s.userRepo.FindByID(u.Id)
+	if err != nil {
+		if errors.Is(err, e.ErrRecordNotFound) {
+			return nil, e.NewError(http.StatusNotFound, "User doesn't exist", e.ErrRecordNotFound)
+		}
+		return nil, e.NewError(http.StatusInternalServerError, "Failed to get user", err)
+	}
 
-// 	// Check if user exists
-// 	existingUser, err := s.userRepo.FindByID(id)
-// 	if err != nil {
-// 		if errors.Is(err, repository.ErrNotFound) {
-// 			return nil, fmt.Errorf("%w: id=%d", ErrUserNotFound, id)
-// 		}
-// 		return nil, fmt.Errorf("failed to get user: %w", err)
-// 	}
+	// Check if email is being changed and if it's already taken
+	if u.Email != existingUser.Email {
+		exists, err := s.userRepo.ExistsByEmail(u.Email)
+		if err != nil {
+			return nil, e.NewError(http.StatusInternalServerError, "failed to check user existence", err)
+		}
+		if exists {
+			return nil, e.NewError(http.StatusBadRequest, "User with email already exists", e.ErrUserExists)
+		}
+	}
 
-// 	// Check if email is being changed and if it's already taken
-// 	if email != existingUser.Email {
-// 		exists, err := s.userRepo.ExistsByEmail(email)
-// 		if err != nil {
-// 			return nil, fmt.Errorf("failed to check user existence: %w", err)
-// 		}
-// 		if exists {
-// 			return nil, fmt.Errorf("%w: email=%s", ErrUserExists, email)
-// 		}
-// 	}
+	existingUser.Name = u.Name
+	existingUser.Email = u.Email
 
-// 	existingUser.Name = name
-// 	existingUser.Email = email
+	updatedUser, err := s.userRepo.Update(existingUser)
+	if err != nil {
+		return nil, e.NewError(http.StatusInternalServerError, "failed to update user", err)
+	}
 
-// 	updatedUser, err := s.userRepo.Update(existingUser)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to update user: %w", err)
-// 	}
-
-// 	return updatedUser, nil
-// }
+	return updatedUser.ToUserDTO(), nil
+}
 
 // // DeleteUser removes a user by their ID
-// func (s *UserService) DeleteUser(id int64) error {
-// 	if id <= 0 {
-// 		return fmt.Errorf("%w: invalid ID", ErrInvalidUserData)
-// 	}
+func (s *UserService) DeleteUser(id int64) *e.Error {
+	if id <= 0 {
+		return e.NewError(http.StatusBadRequest, "invalid Id", e.ErrInvalidUserData)
+	}
 
-// 	// Check if user exists
-// 	exists, err := s.userRepo.ExistsByID(id)
-// 	if err != nil {
-// 		return fmt.Errorf("failed to check user existence: %w", err)
-// 	}
-// 	if !exists {
-// 		return fmt.Errorf("%w: id=%d", ErrUserNotFound, id)
-// 	}
+	// Check if user exists
+	exists, err := s.userRepo.ExistsByID(id)
+	if err != nil {
+		return e.NewError(http.StatusInternalServerError, "Failed to check for user", err)
+	}
+	if !exists {
+		return e.NewError(http.StatusNotFound, "User doesn't exist", e.ErrRecordNotFound)
+	}
 
-// 	if err := s.userRepo.Delete(id); err != nil {
-// 		return fmt.Errorf("failed to delete user: %w", err)
-// 	}
+	if err := s.userRepo.Delete(id); err != nil {
+		return e.NewError(http.StatusInternalServerError, "Failed to delete user", err)
+	}
 
-// 	return nil
-// }
+	return nil
+}
 
 // validateUserData validates user input data
 func (s *UserService) validateUserData(name, email string) error {
 	if name == "" {
-		return fmt.Errorf("%w: name is required", ErrInvalidUserData)
+		return fmt.Errorf("%w: name is required", e.ErrInvalidUserData)
 	}
 	if email == "" {
-		return fmt.Errorf("%w: email is required", ErrInvalidUserData)
+		return fmt.Errorf("%w: email is required", e.ErrInvalidUserData)
 	}
 	// Add more validation as needed (e.g., email format, name length, etc.)
 	return nil
