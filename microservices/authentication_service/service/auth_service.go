@@ -32,7 +32,9 @@ func NewAuthService(AuthRepo repository.AuthRepository) *AuthService {
 	}
 }
 
+// service used to login users (generate new tokens and revoke old ones)
 func (s *AuthService) UserLogin(u *dtos.UserLogin) (*dtos.UserLoginResponse, *e.Error) {
+	//make sure user exists
 	existing, err := s.AuthRepo.FindUserByEmail(u.Email)
 	if err != nil {
 		if errors.Is(err, e.ErrRecordNotFound) {
@@ -41,10 +43,12 @@ func (s *AuthService) UserLogin(u *dtos.UserLogin) (*dtos.UserLoginResponse, *e.
 		return nil, e.NewError(http.StatusInternalServerError, "An error occurred when fetching the user", err)
 	}
 
+	//ensure password lines up with salted hash for user
 	if err := bcrypt.CompareHashAndPassword([]byte(existing.Password), []byte(u.Password)); err != nil {
 		return nil, e.NewError(http.StatusUnauthorized, "Invalid password", err)
 	}
 
+	//convert user to DTO
 	existingDTO := existing.ToUserDTO()
 
 	//generate access token
@@ -59,16 +63,16 @@ func (s *AuthService) UserLogin(u *dtos.UserLogin) (*dtos.UserLoginResponse, *e.
 		return nil, e.NewError(http.StatusInternalServerError, "Failed to generate refresh token", err)
 	}
 
-	//hash refresh for verification
+	//hash refresh for verification and security
 	hashedToken := s.hashToken(rawRefreshToken)
 
+	//store refresh token in database and revoke all old refresh tokens
 	refreshToken := &models.RefreshToken{
 		UserID:    existing.ID,
 		TokenHash: string(hashedToken),
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 	}
 
-	//store refresh token in database and revoke all old refresh tokens
 	if err := s.AuthRepo.CreateNewRefreshToken(refreshToken); err != nil {
 		return nil, e.NewError(http.StatusInternalServerError, "Failed to store refresh token", err)
 	}
@@ -76,6 +80,7 @@ func (s *AuthService) UserLogin(u *dtos.UserLogin) (*dtos.UserLoginResponse, *e.
 	return dtos.NewUserLoginResponse(accessToken, rawRefreshToken), nil
 }
 
+// function used to refresh access token given a valid refresh token
 func (s *AuthService) RefreshToken(refreshToken string) (*dtos.RefreshResponse, *e.Error) {
 	//parse and validate the refresh token
 	token, err := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
@@ -131,6 +136,7 @@ func (s *AuthService) RefreshToken(refreshToken string) (*dtos.RefreshResponse, 
 	return dtos.NewRefreshResponse(newAccessToken), nil
 }
 
+// function used to logout a user within the service (revoke all tokens under them)
 func (s *AuthService) Logout(userId uint) *e.Error {
 	if err := s.AuthRepo.RevokeAllTokensByUserID(userId); err != nil {
 		return e.NewError(http.StatusInternalServerError, "Failed to log out user", err)
@@ -154,11 +160,12 @@ func (s *AuthService) generateJWT(u *dtos.User, duration time.Duration) (string,
 	return token.SignedString([]byte(c.LoadConfig().JwtSecret)) // Sign with the secret
 }
 
-func (s *AuthService) ParseJWT(tokenString string) (*dtos.CustomClaims, error) {
+// helper function to parse JWT tokens
+func (s *AuthService) ParseJWT(tokenString *string) (*dtos.CustomClaims, error) {
 	claims := &dtos.CustomClaims{}
 
 	// Parse the token with the claims and validate
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(*tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(c.LoadConfig().JwtSecret), nil
 	})
 

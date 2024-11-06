@@ -22,6 +22,7 @@ func NewMysqlUserRepository(db *gorm.DB) UserRepository {
 	//go to default db if none is given
 
 	if db == nil {
+		//load default database via environment variables
 		conf := config.LoadConfig()
 		dsn := FormatMysqlConnection(conf.DBUser, conf.DBPassword, conf.DBHost, conf.DBPort, conf.DBName)
 		var err error

@@ -8,10 +8,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// simple function to test connection to gateway
 func helloWorld(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, "Hello World!")
 }
 
+// helper function to create a proxy for a url
 func CreateProxy(proxyUrl string) gin.HandlerFunc {
 	// URL of the user service (matching the service name in docker-compose)
 	serviceURL, err := url.Parse(proxyUrl)
@@ -26,13 +28,14 @@ func CreateProxy(proxyUrl string) gin.HandlerFunc {
 	}
 }
 
+// abstracting create router for testing
 func CreateRouter() *gin.Engine {
 	router := gin.Default()
 
-	// Base route
+	//Base Router
 	router.GET("/", helloWorld)
 
-	// User service routes
+	//Creating groups and proxing them to different services based on path
 	users := router.Group("/users")
 	{
 		users.Any("/*path", CreateProxy("http://user-service:8080"))
@@ -53,6 +56,6 @@ func CreateRouter() *gin.Engine {
 
 func main() {
 	router := CreateRouter()
-	// Note: Changed to 0.0.0.0 to be accessible from other containers
+	//note: Changed to 0.0.0.0 to be accessible from other containers
 	router.Run("0.0.0.0:8080")
 }

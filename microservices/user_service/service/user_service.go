@@ -17,9 +17,13 @@ type UserService struct {
 	userRepo repository.UserRepository
 }
 
+// max length of a password, limited by bcrypt
+var MAX_PASSWORD_LENGTH int = 70
+
 // NewUserService creates a new instance of UserService
 func NewUserService(userRepo repository.UserRepository) *UserService {
 	if userRepo == nil {
+		//use default repo
 		userRepo = repository.NewMysqlUserRepository(nil)
 	}
 	return &UserService{
@@ -29,10 +33,6 @@ func NewUserService(userRepo repository.UserRepository) *UserService {
 
 // GetUserByID retrieves a user by their ID
 func (s *UserService) GetUserByID(id uint) (*dtos.User, *e.Error) {
-	if id <= 0 {
-		return nil, e.NewError(http.StatusBadRequest, "invalid Id", e.ErrInvalidUserData)
-	}
-
 	user, err := s.userRepo.FindByID(id)
 
 	if err != nil {
@@ -48,12 +48,7 @@ func (s *UserService) GetUserByID(id uint) (*dtos.User, *e.Error) {
 // CreateUser creates a new user
 func (s *UserService) CreateUser(u dtos.UserCreate) (*dtos.User, *e.Error) {
 
-	hashPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
-
-	if err != nil {
-		return nil, e.NewError(http.StatusInternalServerError, "failed to create password", err)
-	}
-
+	//check that a user with the given email doesn't already exist
 	exists, err := s.userRepo.ExistsByEmail(u.Email)
 	if err != nil {
 		return nil, e.NewError(http.StatusInternalServerError, "error when looking up email", err)
@@ -63,6 +58,19 @@ func (s *UserService) CreateUser(u dtos.UserCreate) (*dtos.User, *e.Error) {
 		return nil, e.NewError(http.StatusBadRequest, "Email already exists", e.ErrUserExists)
 	}
 
+	//bcrypt puts a cap on how long a password can be
+	if len(u.Password) > MAX_PASSWORD_LENGTH {
+		return nil, e.NewError(http.StatusBadRequest, "password too long", fmt.Errorf("password must be less than %d characters", MAX_PASSWORD_LENGTH))
+	}
+
+	//generate a salted hashed password with bcrypt
+	hashPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
+
+	if err != nil {
+		return nil, e.NewError(http.StatusInternalServerError, "failed to create password", err)
+	}
+
+	//create new user within db
 	user := models.NewUser(u.Name, u.Email, string(hashPassword))
 	createdUser, err := s.userRepo.Create(user)
 	if err != nil {
@@ -72,13 +80,13 @@ func (s *UserService) CreateUser(u dtos.UserCreate) (*dtos.User, *e.Error) {
 	return createdUser.ToUserDTO(), nil
 }
 
-// // UpdateUser updates an existing user
+// UpdateUser updates an existing user
 func (s *UserService) UpdateUser(u dtos.User) (*dtos.User, *e.Error) {
 	if u.Id <= 0 {
 		return nil, e.NewError(http.StatusBadRequest, "Invalid Id", e.ErrInvalidUserData)
 	}
 
-	// Check if user exists
+	//check if user exists
 	existingUser, err := s.userRepo.FindByID(u.Id)
 	if err != nil {
 		if errors.Is(err, e.ErrRecordNotFound) {
@@ -87,7 +95,7 @@ func (s *UserService) UpdateUser(u dtos.User) (*dtos.User, *e.Error) {
 		return nil, e.NewError(http.StatusInternalServerError, "Failed to get user", err)
 	}
 
-	// Check if email is being changed and if it's already taken
+	//check if email is being changed and if it's already taken
 	if u.Email != existingUser.Email {
 		exists, err := s.userRepo.ExistsByEmail(u.Email)
 		if err != nil {
@@ -101,6 +109,7 @@ func (s *UserService) UpdateUser(u dtos.User) (*dtos.User, *e.Error) {
 	existingUser.Name = u.Name
 	existingUser.Email = u.Email
 
+	//update info in db
 	updatedUser, err := s.userRepo.Update(existingUser)
 	if err != nil {
 		return nil, e.NewError(http.StatusInternalServerError, "failed to update user", err)
@@ -109,7 +118,7 @@ func (s *UserService) UpdateUser(u dtos.User) (*dtos.User, *e.Error) {
 	return updatedUser.ToUserDTO(), nil
 }
 
-// // DeleteUser removes a user by their ID
+// DeleteUser removes a user by their ID
 func (s *UserService) DeleteUser(id uint) *e.Error {
 	if id <= 0 {
 		return e.NewError(http.StatusBadRequest, "invalid Id", e.ErrInvalidUserData)
@@ -128,17 +137,5 @@ func (s *UserService) DeleteUser(id uint) *e.Error {
 		return e.NewError(http.StatusInternalServerError, "Failed to delete user", err)
 	}
 
-	return nil
-}
-
-// validateUserData validates user input data
-func (s *UserService) validateUserData(name, email string) error {
-	if name == "" {
-		return fmt.Errorf("%w: name is required", e.ErrInvalidUserData)
-	}
-	if email == "" {
-		return fmt.Errorf("%w: email is required", e.ErrInvalidUserData)
-	}
-	// Add more validation as needed (e.g., email format, name length, etc.)
 	return nil
 }

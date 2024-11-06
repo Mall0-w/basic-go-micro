@@ -28,13 +28,13 @@ func NewUserController(userService *UserService) *UserController {
 
 // DefineRoutes sets up the routing for user endpoints
 func (uc *UserController) DefineRoutes(r *gin.Engine) {
-	userGroup := r.Group("/users") // Using plural form as per REST conventions
+	userGroup := r.Group("/users")
 	{
-		userGroup.GET("/", uc.TestConnection)
+		userGroup.GET("/health", uc.TestConnection)
 		userGroup.GET("/:id", uc.GetUserByID)
 		userGroup.POST("/", uc.CreateUser)
-		userGroup.PUT("/:id", uc.UpdateUser)    // Added for completeness
-		userGroup.DELETE("/:id", uc.DeleteUser) // Added for completeness
+		userGroup.PUT("/:id", uc.UpdateUser)
+		userGroup.DELETE("/:id", uc.DeleteUser)
 	}
 }
 
@@ -79,7 +79,7 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 	c.JSON(http.StatusCreated, user)
 }
 
-// // UpdateUser handles PUT requests to update an existing user
+// UpdateUser handles PUT requests to update an existing user
 func (uc *UserController) UpdateUser(c *gin.Context) {
 	id, err := uc.parseUserID(c)
 	if err != nil {
@@ -107,7 +107,7 @@ func (uc *UserController) UpdateUser(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-// // DeleteUser handles DELETE requests to remove a user
+// DeleteUser handles DELETE requests to remove a user
 func (uc *UserController) DeleteUser(c *gin.Context) {
 	id, err := uc.parseUserID(c)
 	if err != nil {
@@ -122,7 +122,7 @@ func (uc *UserController) DeleteUser(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// // parseUserID is a helper function to parse and validate user IDs from requests
+// parseUserID is a helper function to parse and validate user IDs from requests
 func (uc *UserController) parseUserID(c *gin.Context) (uint, error) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseInt(idParam, 10, 64)
@@ -133,7 +133,7 @@ func (uc *UserController) parseUserID(c *gin.Context) (uint, error) {
 		return 0, err
 	}
 
-	// Ensure the ID is non-negative before casting
+	//ensure the ID is non-negative before casting
 	if id < 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "User ID cannot be negative",
@@ -141,6 +141,6 @@ func (uc *UserController) parseUserID(c *gin.Context) (uint, error) {
 		return 0, fmt.Errorf("user ID cannot be negative")
 	}
 
-	// Cast the ID to uint
+	//cast the ID to uint
 	return uint(id), nil
 }
