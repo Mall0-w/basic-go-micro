@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"user-service/dtos"
@@ -69,7 +70,7 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 		return
 	}
 
-	user, e := uc.userService.CreateUser(&request)
+	user, e := uc.userService.CreateUser(request)
 	if e != nil {
 		c.JSON(http.StatusInternalServerError, e.ToJson())
 		return
@@ -97,7 +98,7 @@ func (uc *UserController) UpdateUser(c *gin.Context) {
 
 	request.Id = id
 
-	user, e := uc.userService.UpdateUser(&request)
+	user, e := uc.userService.UpdateUser(request)
 	if e != nil {
 		c.JSON(http.StatusInternalServerError, e.ToJson())
 		return
@@ -122,7 +123,7 @@ func (uc *UserController) DeleteUser(c *gin.Context) {
 }
 
 // // parseUserID is a helper function to parse and validate user IDs from requests
-func (uc *UserController) parseUserID(c *gin.Context) (int64, error) {
+func (uc *UserController) parseUserID(c *gin.Context) (uint, error) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
@@ -131,5 +132,15 @@ func (uc *UserController) parseUserID(c *gin.Context) (int64, error) {
 		})
 		return 0, err
 	}
-	return id, nil
+
+	// Ensure the ID is non-negative before casting
+	if id < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "User ID cannot be negative",
+		})
+		return 0, fmt.Errorf("user ID cannot be negative")
+	}
+
+	// Cast the ID to uint
+	return uint(id), nil
 }

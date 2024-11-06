@@ -1,6 +1,6 @@
 package models
 
-import "user-service/dtos"
+import "authentication-service/dtos"
 
 type User struct {
 	ID       uint `gorm:"primaryKey"`

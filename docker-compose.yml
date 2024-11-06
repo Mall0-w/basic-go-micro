@@ -23,6 +23,21 @@ services:
       - microservices
       - user
   
+  auth-service:
+    build: 
+      context: ./microservices/authentication_service
+      dockerfile: Dockerfile
+    env_file:
+      - ./microservices/authentication_service/.env
+    expose:
+      - "8080"
+    depends_on:
+      user-db:
+        condition: service_healthy # Only start after user-db is healthy
+    networks:
+      - microservices
+      - auth
+
   inventory-service:
     build: 
       context: ./microservices/inventory_service
@@ -44,6 +59,7 @@ services:
       - ./dbs/user-service-db:/var/lib/mysql
     networks:
       - user
+      - auth
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -55,3 +71,5 @@ networks:
     name: microservices
   user:
     name: user
+  auth:
+    name: auth

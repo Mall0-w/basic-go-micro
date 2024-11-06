@@ -43,6 +43,11 @@ func CreateRouter() *gin.Engine {
 		inventory.Any("/*path", CreateProxy("http://inventory-service:8080"))
 	}
 
+	auth := router.Group("/auth")
+	{
+		auth.Any("/*path", CreateProxy("http://auth-service:8080"))
+	}
+
 	return router
 }
 

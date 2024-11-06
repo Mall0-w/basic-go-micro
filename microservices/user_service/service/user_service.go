@@ -28,7 +28,7 @@ func NewUserService(userRepo repository.UserRepository) *UserService {
 }
 
 // GetUserByID retrieves a user by their ID
-func (s *UserService) GetUserByID(id int64) (*dtos.User, *e.Error) {
+func (s *UserService) GetUserByID(id uint) (*dtos.User, *e.Error) {
 	if id <= 0 {
 		return nil, e.NewError(http.StatusBadRequest, "invalid Id", e.ErrInvalidUserData)
 	}
@@ -46,7 +46,7 @@ func (s *UserService) GetUserByID(id int64) (*dtos.User, *e.Error) {
 }
 
 // CreateUser creates a new user
-func (s *UserService) CreateUser(u *dtos.UserCreate) (*dtos.User, *e.Error) {
+func (s *UserService) CreateUser(u dtos.UserCreate) (*dtos.User, *e.Error) {
 
 	hashPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 
@@ -73,7 +73,7 @@ func (s *UserService) CreateUser(u *dtos.UserCreate) (*dtos.User, *e.Error) {
 }
 
 // // UpdateUser updates an existing user
-func (s *UserService) UpdateUser(u *dtos.User) (*dtos.User, *e.Error) {
+func (s *UserService) UpdateUser(u dtos.User) (*dtos.User, *e.Error) {
 	if u.Id <= 0 {
 		return nil, e.NewError(http.StatusBadRequest, "Invalid Id", e.ErrInvalidUserData)
 	}
@@ -110,7 +110,7 @@ func (s *UserService) UpdateUser(u *dtos.User) (*dtos.User, *e.Error) {
 }
 
 // // DeleteUser removes a user by their ID
-func (s *UserService) DeleteUser(id int64) *e.Error {
+func (s *UserService) DeleteUser(id uint) *e.Error {
 	if id <= 0 {
 		return e.NewError(http.StatusBadRequest, "invalid Id", e.ErrInvalidUserData)
 	}

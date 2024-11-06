@@ -40,7 +40,7 @@ func NewMysqlUserRepository(db *gorm.DB) UserRepository {
 	}
 }
 
-func (r MysqlUserRepository) FindByID(id int64) (*User, error) {
+func (r MysqlUserRepository) FindByID(id uint) (*User, error) {
 	var user User
 	result := r.DB.First(&user, id)
 
@@ -50,7 +50,7 @@ func (r MysqlUserRepository) FindByID(id int64) (*User, error) {
 	return &user, nil
 }
 
-func (r MysqlUserRepository) ExistsByID(id int64) (bool, error) {
+func (r MysqlUserRepository) ExistsByID(id uint) (bool, error) {
 	var count int64
 	result := r.DB.Model(&User{}).Where("id = ?", id).Count(&count)
 	if result.Error != nil {
@@ -84,7 +84,7 @@ func (r MysqlUserRepository) Update(user *User) (*User, error) {
 	return user, nil
 }
 
-func (r MysqlUserRepository) Delete(id int64) error {
+func (r MysqlUserRepository) Delete(id uint) error {
 	result := r.DB.Delete(&User{ID: id})
 	return result.Error
 }
